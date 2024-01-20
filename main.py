@@ -1,34 +1,37 @@
 import sqlite3
-import requests
-from bs4 import BeautifulSoup
-import datetime
+try:
+    import schedule
+except ImportError:
+    import subprocess
+    subprocess.check_call(['pip', 'install', 'schedule'])
+    exit()
+from datetime import datetime
 
-# Створення бази даних
-conn = sqlite3.connect('weather_1.sl3')
-c = conn.cursor()
+def save_to_database(date_time, temperature):
+    conn = sqlite3.connect('weather.db')
+    c = conn.cursor()
 
-c.execute('''CREATE TABLE IF NOT EXISTS weather_data
+    c.execute('''CREATE TABLE IF NOT EXISTS weather_data
               (date_time TEXT, temperature REAL)''')
 
-# Отримання інформації про температуру з веб-сайту
-url = 'https://www.accuweather.com/uk/ua/lutsk/326220/weather-forecast/326220'
-response = requests.get(url)
-soup = BeautifulSoup(response.text, 'html.parser')
+def update_weather():
+    dates = ["20 січня"] * 8
+    times = ["03:00", "06:00", "09:00", "12:00", "15:00", "18:00", "21:00", "00:00"]
+    temperatures = [-5, -5, -2, 1, 2, 1, -3, -6]
 
-# Отримання поточної дати та часу
-current_datetime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    current_date = datetime.now().strftime("%Y-%m-%d")
 
-# Перевірка наявності тега span з класом temperature
-temperature_span = soup.find('span', {'class': 'temperature'})
-if temperature_span:
-    temperature = float(temperature_span.text.strip())
-    print(f'Temperature: {temperature}')
+    for i in range(len(times)):
+        date_time = f"{current_date} {times[i]}"
+        temperature = temperatures[i]
+        save_to_database(date_time, temperature)
 
-    # Внесення даних в базу даних
-    c.execute("INSERT INTO weather_data (date_time, temperature) VALUES (?, ?)", (current_datetime, temperature))
-    conn.commit()
-else:
-    print('Unable to find temperature information on the page')
+update_weather()
 
-# Закриття з'єднання з базою даних
-conn.close()
+schedule.every(30).minutes.do(update_weather())
+
+try:
+    while True:
+        schedule.run_pending()
+except KeyboardInterrupt:
+    print("Програму зупинено.")
